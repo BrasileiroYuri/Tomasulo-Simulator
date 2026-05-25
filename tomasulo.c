@@ -1,9 +1,13 @@
 #include "tomasulo.h"
+#include <stddef.h>
 #include <stdlib.h>
 
-InstructionQueue *init_queue(uint8_t size) {
-  InstructionQueue *queue = malloc(sizeof(InstructionQueue));
+void init_queue(InstructionQueue *queue, size_t size) {
+  queue = malloc(sizeof(InstructionQueue));
   queue->queue = malloc(size * sizeof(Instruction));
   queue->size = size;
-  return queue;
+}
+
+void createMemory(Machine *mach, size_t size) {
+  mach->instrMem.mem = (Instruction *)malloc(size * sizeof(Instruction));
 }
