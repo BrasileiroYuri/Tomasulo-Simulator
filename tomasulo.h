@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef const char *String; /* alias para cadeias de caracteres. */
+typedef const char *String; /* Alias para cadeias de caracteres. */
 typedef int Value;          /* Nosso valor é um inteiro. */
 
 typedef enum {
@@ -20,6 +20,13 @@ typedef struct {
   uint8_t num; //! Número do registrador.
   Value value; //! Valor armazenado.
 } Register;
+
+/*
+ * @brief Conjuntos de processadores da máquina.
+ */
+typedef struct {
+  Register *regs; //! Lista de registradores.
+} RegisterFile;
 
 /*
  * @brief Struct que representa uma instrução.
@@ -105,6 +112,8 @@ typedef struct {
  */
 typedef struct {
   InstructionMemory instrMem;   //! Memória de instrução.
+  DataMemory dataMem;           //! Memória de dados.
+  RegisterFile regFile;         //! Lista de registradores.
   InstructionQueue queue;       //! Fila de instruções.
   ReservationStation *stations; //! Conjunto de RSs da arquitetura.
   LSUnit *lsUnits;              //! Conjunto de Load/Store units.
@@ -115,23 +124,40 @@ typedef struct {
 typedef struct {
   size_t instrMemSize; //! Tamanho da memória de instrução.
   size_t dataMemSize;  //! Tamanho da memória de data.
+  size_t RegFileSize;  //! Tamanho da memória de registradores.
 } MachineConfig;
 
 /*
  * @brief Aloca memória e inicia atributos de uma fila de instruções.
  *
- * @param queue Fila a ser preenchida.
- * @param size Tamanho a ser alocado.
+ * @param Fila a ser preenchida.
+ * @param Tamanho a ser alocado.
  */
-void initQueue(InstructionQueue *, size_t);
+void createQueue(InstructionQueue *, size_t);
 
 /*
  * @brief Cria memória de instruções.
  *
- * @param queue Fila a ser preenchida.
- * @param size Tamanho a ser alocado.
+ * @param Fila a ser preenchida.
+ * @param Tamanho a ser alocado.
  */
 void createInstructionMemory(InstructionMemory *, size_t);
+
+/*
+ * @brief Cria memória de dados.
+ *
+ * @param Memória de dados a ser alocada.
+ * @param Tamanho a ser alocado.
+ */
+void createDataMemory(DataMemory *, size_t);
+
+/*
+ * @brief Cria Register File.
+ *
+ * @param Memória de registradores a ser alocada.
+ * @param Tamanho a ser alocado.
+ */
+void createRegFile(RegisterFile *, size_t);
 
 /*
  * @brief Função para iniciar rotinas de iniciação da máquina, como alocar
