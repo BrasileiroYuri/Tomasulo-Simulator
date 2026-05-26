@@ -50,5 +50,12 @@ void createDataMemory(DataMemory *dataMem, size_t size) {
 void simulation(Machine *mach) {
   printf(">>> Iniciando simulação:\n");
 
+  size_t done = 0;
+  size_t size = mach->instrMem.size;
+
+  while (done < size) {
+    //! Colocar mais uma instrução em Issue...
+  }
+
   printf(">>> Finalizando simulação.\n");
 }

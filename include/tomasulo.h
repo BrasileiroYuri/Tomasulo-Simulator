@@ -11,6 +11,7 @@ typedef enum {
   ISSUE,    //! Estado de Issue.
   EXECUTE,  //! Estado de execução.
   WRITE,    //! Estado de escrita.
+  DONE,     //! Instrução completa.
 } State;
 
 /*
@@ -32,6 +33,7 @@ typedef struct {
  * @brief Struct que representa uma instrução.
  */
 typedef struct {
+  size_t rsId;     //! Define que tipo de RS pode carregá-la.
   String name;     //! Nome da instrução, ex: SUB, ADD, etc.
   Register dest;   //! Registrador destino.
   Register src1;   //! Registrador fonte 1.
@@ -51,11 +53,12 @@ typedef struct {
  * @brief RS (Reservation Station).
  */
 typedef struct ReservationStation {
-  String name;                   //! Nome da Reservation Station.
-  bool busy;                     //! Define se a unidade está ocupada.
-  String op;                     //! Define a operação da instrução atual na RS.
-  Value Vj;                      //! Valor do primeiro operando.
-  Value Vk;                      //! Valor do primeiro operando.
+  size_t type; //! Útil para saber qual Instruction essa RS pode usar.
+  String name; //! Nome da Reservation Station.
+  bool busy;   //! Define se a unidade está ocupada.
+  String op;   //! Define a operação da instrução atual na RS.
+  Value Vj;    //! Valor do primeiro operando.
+  Value Vk;    //! Valor do primeiro operando.
   struct ReservationStation *Qj; //! RS responsável por retornar Vj.
   struct ReservationStation *Qk; //! RS responsável por retornar Vk.
   bool Rj;                       //! Define se Vj está disponível.
