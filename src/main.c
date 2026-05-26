@@ -1,4 +1,4 @@
-#include "tomasulo.h"
+#include "../include/tomasulo.h"
 
 #define MEM_SIZE 32
 #define DATA_SIZE 32

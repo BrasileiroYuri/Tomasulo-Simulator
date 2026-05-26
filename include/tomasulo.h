@@ -121,6 +121,9 @@ typedef struct {
   Bus cdb;                      //! Barramento CDB.
 } Machine;
 
+/*
+ * @brief Struct de configuração da arquitetura.
+ */
 typedef struct {
   size_t instrMemSize; //! Tamanho da memória de instrução.
   size_t dataMemSize;  //! Tamanho da memória de data.
