@@ -47,8 +47,8 @@ typedef struct ReservationStation {
   String name;                   //! Nome da Reservation Station.
   bool busy;                     //! Define se a unidade está ocupada.
   String op;                     //! Define a operação da instrução atual na RS.
-  Value *Vj;                     //! Valor do primeiro operando.
-  Value *Vk;                     //! Valor do primeiro operando.
+  Value Vj;                      //! Valor do primeiro operando.
+  Value Vk;                      //! Valor do primeiro operando.
   struct ReservationStation *Qj; //! RS responsável por retornar Vj.
   struct ReservationStation *Qk; //! RS responsável por retornar Vk.
   bool Rj;                       //! Define se Vj está disponível.
@@ -70,15 +70,17 @@ typedef struct {
  * null, então tem uma RS para escrever no register R onde R.num = i.
  */
 typedef struct {
-  uint8_t size;                 //! Tamanho da lista abaixo.
-  ReservationStation *stations; //! Lista de RS para ordenado por Register.
+  uint8_t size;                  //! Tamanho da lista abaixo.
+  ReservationStation **stations; //! Lista de RS para ordenado por Register.
 } RegisterTable;
 
 /*
- * @brief Representa um barramento, ou seja, apenas um canal com uma instrução.
+ * @brief Representa um barramento.
  */
 typedef struct {
-  Instruction *instr; //! Instrução presente no barramento.
+  String tag;  //! Nome da RS que está broadcastando
+  Value value; //! Resultado
+  bool valid;  //! Define se tem algo no barramento nesse ciclo
 } Bus;
 
 /*
@@ -110,10 +112,47 @@ typedef struct {
   Bus cdb;                      //! Barramento CDB.
 } Machine;
 
-/*
- * @brief método responsável por alocar memória para a fila.
- * @param size tamanho da fila (quantidade de instruções).
- */
-void init_queue(InstructionQueue *, size_t);
+typedef struct {
+  size_t instrMemSize; //! Tamanho da memória de instrução.
+  size_t dataMemSize;  //! Tamanho da memória de data.
+} MachineConfig;
 
-void createMemory(Machine *, size_t);
+/*
+ * @brief Aloca memória e inicia atributos de uma fila de instruções.
+ *
+ * @param queue Fila a ser preenchida.
+ * @param size Tamanho a ser alocado.
+ */
+void initQueue(InstructionQueue *, size_t);
+
+/*
+ * @brief Cria memória de instruções.
+ *
+ * @param queue Fila a ser preenchida.
+ * @param size Tamanho a ser alocado.
+ */
+void createInstructionMemory(InstructionMemory *, size_t);
+
+/*
+ * @brief Função para iniciar rotinas de iniciação da máquina, como alocar
+ * memória.
+ *
+ * @param Máquina a ser iniciada.
+ * @param Configuração da máquina.
+ */
+void initMachine(Machine *, MachineConfig);
+
+/*
+ * @brief Função para finalizar rotinas de iniciação da máquina.
+ *
+ * @param Máquina a ser iniciada.
+ * @param Configuração da máquina.
+ */
+void endMachine(Machine *);
+
+/*
+ * @brief Função responsável pelo loop de simulação.
+ *
+ * @param Máquina a ser simulada.
+ */
+void simulation(Machine *);

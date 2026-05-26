@@ -1,13 +1,20 @@
 #include "tomasulo.h"
-#include <stdio.h>
 
 #define MEM_SIZE 6
+#define DATA_SIZE 6
 
 int main() {
-  printf(">>> Iniciando simulação:\n");
+  MachineConfig mcfg = {
+      .instrMemSize = MEM_SIZE,
+      .dataMemSize = DATA_SIZE,
+  };
 
   Machine mach;
-  createMemory(&mach, MEM_SIZE);
+  initMachine(&mach, mcfg);
+
+  simulation(&mach);
+
+  endMachine(&mach);
 
   return EXIT_SUCCESS;
 }
