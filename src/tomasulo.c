@@ -1,7 +1,5 @@
 #include "../include/tomasulo.h"
-#include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 void createQueue(InstructionQueue *queue, size_t size) {
   printf("\t- Instanciando fila de instruções.\n\t- Size: %zu\n\n", size);
