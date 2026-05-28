@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define RS_TYPE_ADD 1
+#define RS_TYPE_MUL 2
+
 typedef const char *String; /* Alias para cadeias de caracteres. */
 typedef int Value;          /* Nosso valor é um inteiro. */
 
@@ -119,7 +122,9 @@ typedef struct {
   RegisterFile regFile;         //! Lista de registradores.
   InstructionQueue queue;       //! Fila de instruções.
   ReservationStation *stations; //! Conjunto de RSs da arquitetura.
+  size_t numStations;           //! Guarda o total de RS(ADD+MUL)
   LSUnit *lsUnits;              //! Conjunto de Load/Store units.
+  size_t numLSUnits;            //! Guarda o total de LOAD/STORE
   RegisterTable regTable;       //! Tabela de registradores.
   Bus cdb;                      //! Barramento CDB.
 } Machine;
@@ -128,9 +133,11 @@ typedef struct {
  * @brief Struct de configuração da arquitetura.
  */
 typedef struct {
-  size_t instrMemSize; //! Tamanho da memória de instrução.
-  size_t dataMemSize;  //! Tamanho da memória de data.
-  size_t RegFileSize;  //! Tamanho da memória de registradores.
+  size_t instrMemSize;     //! Tamanho da memória de instrução.
+  size_t dataMemSize;      //! Tamanho da memória de data.
+  size_t RegFileSize;      //! Tamanho da memória de registradores.
+  size_t numAddStations;   //! Tamanho da quantidade de "vagas" para soma/subtração
+  size_t numMulStations;   //! Tamanho da quantidade de "vagas" para multiplicação/divisão
 } MachineConfig;
 
 /*
@@ -188,3 +195,29 @@ void endMachine(Machine *);
  * @param Máquina a ser simulada.
  */
 void simulation(Machine *);
+
+/*
+ * @brief Lê o arquivo assembly e preenche a fila e memória de instruções.
+ *
+ * @param Caminho do arquivo .asm.
+ * @param Máquina a ser preenchida.
+ */
+void loadFile(const char *filepath, Machine *mach);
+
+/*
+ * @brief Aloca memória e inicializa as Estações de Reserva (Reservation Stations).
+ * * Cria dinamicamente as estações para as unidades de Adição/Subtração e 
+ * Multiplicação/Divisão baseando-se nas quantidades definidas na configuração. 
+ *
+ * @param mach Ponteiro para a máquina onde as estações serão instanciadas.
+ * @param mcfg Configuração da máquina contendo a quantidade de estações de cada tipo.
+ */
+void createStations(Machine *mach, MachineConfig mcfg);
+
+/*
+ * @brief Imprime o estado atual das Estações de Reserva e Registradores no terminal.
+ *
+ * @param mach Ponteiro para a máquina.
+ * @param clock Ciclo de clock atual.
+ */
+void printState(Machine *mach, int clock);
