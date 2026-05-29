@@ -18,7 +18,10 @@ int main(int argc, char *argv[]) {
       .dataMemSize = DATA_SIZE,
       .RegFileSize = REGFILE_SIZE,
       .numAddStations = 3,
-      .numMulStations = 2
+      .numMulStations = 2,
+      .latPattern = 2,   // 4 ciclos para ADD, SUB, LD, SD
+      .latMUL = 10,      // 10 ciclos para MUL
+      .latDIV = 40       // 40 ciclos para DIV
   };
 
   Machine mach;

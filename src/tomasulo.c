@@ -29,6 +29,9 @@ void initMachine(Machine *mach, MachineConfig mcfg) {
   createRegisterTable(&mach->regTable, mcfg.RegFileSize);
 
   //! - [2] Iniciando componentes.
+  mach->latPattern = mcfg.latPattern;
+  mach->latMUL = mcfg.latMUL;
+  mach->latDIV = mcfg.latDIV;
 }
 
 void endMachine(Machine *mach) {
@@ -85,7 +88,7 @@ void simulation(Machine *mach) {
     clock++;
     
     // Trava de segurança limite, para teste
-    if (clock > 50) {
+    if (clock > 80) {
         printf("\n[!] Limite de 50 ciclos atingido. Encerrando por seguranca.\n");
         break;
     }
@@ -274,10 +277,10 @@ int getRequiredRSType(String op) {
     return 0;
 }
 //Função auxiliar apenas para definir a demora do ciclo
-int getLatency(String op) {
-    if (strcmp(op, "MUL") == 0) return 5;  // Multiplicação demora mais
-    if (strcmp(op, "DIV") == 0) return 10; // Divisão demora muito
-    return 2; // ADD, SUB, LD, SD demoram 2 ciclos por padrão
+int getLatency(Machine *mach, String op) {
+    if (strcmp(op, "MUL") == 0) return mach->latMUL;  // Multiplicação demora mais
+    if (strcmp(op, "DIV") == 0) return mach->latDIV; // Divisão demora muito
+    return mach->latPattern; // ADD, SUB, LD, SD demoram 2 ciclos por padrão
 }
 
 bool issueInstruction(Machine *mach, size_t *pc) {
@@ -335,7 +338,7 @@ bool issueInstruction(Machine *mach, size_t *pc) {
         mach->regTable.stations[instr->dest.num] = freeRS;
     }
     
-    freeRS->cyclesLeft = getLatency(instr->name);
+    freeRS->cyclesLeft = getLatency(mach, instr->name);
 
     instr->currState = ISSUE; // Atualiza status da instrução
     (*pc)++;                  // Avança para a próxima instrução na fila

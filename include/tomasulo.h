@@ -129,6 +129,9 @@ typedef struct {
   size_t numLSUnits;            //! Guarda o total de LOAD/STORE
   RegisterTable regTable;       //! Tabela de registradores.
   Bus cdb;                      //! Barramento CDB.
+  int latPattern;
+  int latMUL;
+  int latDIV;
 } Machine;
 
 /*
@@ -140,6 +143,9 @@ typedef struct {
   size_t RegFileSize;      //! Tamanho da memória de registradores.
   size_t numAddStations;   //! Tamanho da quantidade de "vagas" para soma/subtração
   size_t numMulStations;   //! Tamanho da quantidade de "vagas" para multiplicação/divisão
+  int latPattern;
+  int latMUL;
+  int latDIV;
 } MachineConfig;
 
 /*
@@ -251,3 +257,5 @@ bool issueInstruction(Machine *mach, size_t *pc);
 void executeInstructions(Machine *mach);
 
 bool writeResult(Machine *mach); 
+
+int getLatency(Machine *mach, String op);
