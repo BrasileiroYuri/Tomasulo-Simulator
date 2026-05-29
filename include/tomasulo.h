@@ -5,6 +5,8 @@
 
 #define RS_TYPE_ADD 1
 #define RS_TYPE_MUL 2
+#define RS_TYPE_LST 3
+
 
 typedef const char *String; /* Alias para cadeias de caracteres. */
 typedef int Value;          /* Nosso valor é um inteiro. */
@@ -67,7 +69,9 @@ typedef struct ReservationStation {
   bool Rj;                       //! Define se Vj está disponível.
   bool Rk;                       //! Define se Vk está disponível.
   int cyclesLeft;                //! Ciclos restantes para terminar a execução.
-  Value result;                  //! O resultado calculado (esperando para ir para o CDB).
+  Value result;                //! O resultado calculado (esperando para ir para o CDB).
+  bool canExecThisCycle;         //! Trava de pipeline para Execução
+  bool canWriteThisCycle;        //! Trava de pipeline para Escrita no CDB
 } ReservationStation;
 
 /*
@@ -129,9 +133,10 @@ typedef struct {
   size_t numLSUnits;            //! Guarda o total de LOAD/STORE
   RegisterTable regTable;       //! Tabela de registradores.
   Bus cdb;                      //! Barramento CDB.
-  int latPattern;
+  int latADD;
   int latMUL;
   int latDIV;
+  int latLST;
 } Machine;
 
 /*
@@ -143,9 +148,11 @@ typedef struct {
   size_t RegFileSize;      //! Tamanho da memória de registradores.
   size_t numAddStations;   //! Tamanho da quantidade de "vagas" para soma/subtração
   size_t numMulStations;   //! Tamanho da quantidade de "vagas" para multiplicação/divisão
-  int latPattern;
+  size_t numLSTStations;   //! Tamanho da quantidade de "vagas" para multiplicação/divisão
+  int latADD;
   int latMUL;
   int latDIV;
+  int latLST;
 } MachineConfig;
 
 /*

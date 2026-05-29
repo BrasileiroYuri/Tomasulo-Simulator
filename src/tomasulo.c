@@ -29,9 +29,10 @@ void initMachine(Machine *mach, MachineConfig mcfg) {
   createRegisterTable(&mach->regTable, mcfg.RegFileSize);
 
   //! - [2] Iniciando componentes.
-  mach->latPattern = mcfg.latPattern;
+  mach->latADD = mcfg.latADD;
   mach->latMUL = mcfg.latMUL;
   mach->latDIV = mcfg.latDIV;
+  mach->latLST = mcfg.latLST;
 }
 
 void endMachine(Machine *mach) {
@@ -72,6 +73,24 @@ void simulation(Machine *mach) {
 
   while (pc < mach->queue.size || hasBusyStations(mach)) {
 
+for (size_t i = 0; i < mach->numStations; i++) {
+        ReservationStation *rs = &mach->stations[i];
+        rs->canExecThisCycle = (rs->busy && rs->Rj && rs->Rk && rs->cyclesLeft > 0);
+        rs->canWriteThisCycle = (rs->busy && rs->cyclesLeft == 0);
+    }
+
+//! [1] WRITE RESULT
+    writeResult(mach);
+
+    //! [2] EXECUTE
+    executeInstructions(mach);
+
+    //! [3] ISSUE
+    if (pc < mach->queue.size) {
+      issueInstruction(mach, &pc);
+    }
+
+    /*
     //! [1] ISSUE (Despacho)
     if (pc < mach->queue.size) {
       issueInstruction(mach, &pc);
@@ -82,14 +101,14 @@ void simulation(Machine *mach) {
 
     //! [3] WRITE RESULT (Escrita no CDB)
     writeResult(mach);
-
+*/
     printState(mach, clock);
-    
+ 
     clock++;
     
     // Trava de segurança limite, para teste
-    if (clock > 80) {
-        printf("\n[!] Limite de 50 ciclos atingido. Encerrando por seguranca.\n");
+    if (clock > 60) {
+        printf("\n[!] Limite de ciclos atingido. Encerrando por seguranca.\n");
         break;
     }
   }
@@ -192,10 +211,10 @@ void loadFile(const char *filepath, Machine *mach) {
 
 void createStations(Machine *mach, MachineConfig mcfg) {
     // O total de estações de reserva da ALU será a soma das de ADD e MUL
-    mach->numStations = mcfg.numAddStations + mcfg.numMulStations;
+    mach->numStations = mcfg.numAddStations + mcfg.numMulStations + mcfg.numLSTStations;
     
     printf("\t- Instanciando Estacoes de Reserva.\n");
-    printf("\t- ADD/SUB: %zu | MUL/DIV: %zu\n\n", mcfg.numAddStations, mcfg.numMulStations);
+    printf("\t- ADD/SUB: %zu | MUL/DIV: | LD/SD: %zu\n\n", mcfg.numAddStations, mcfg.numMulStations, mcfg.numLSTStations);
 
     mach->stations = malloc(mach->numStations * sizeof(ReservationStation));
 
@@ -227,6 +246,22 @@ void createStations(Machine *mach, MachineConfig mcfg) {
         sprintf(nameBuf, "MUL%zu", i + 1);
         mach->stations[idx].name = strdup(nameBuf);
         
+        mach->stations[idx].busy = false;
+        mach->stations[idx].op = NULL;
+        mach->stations[idx].Qj = NULL;
+        mach->stations[idx].Qk = NULL;
+        mach->stations[idx].Vj = 0;
+        mach->stations[idx].Vk = 0;
+        mach->stations[idx].Rj = false;
+        mach->stations[idx].Rk = false;
+    }
+
+for (size_t i = 0; i < mcfg.numLSTStations; i++) {
+        size_t idx = mcfg.numAddStations + mcfg.numMulStations + i;
+        mach->stations[idx].type = RS_TYPE_LST;  
+        char nameBuf[16];
+        sprintf(nameBuf, "LST%zu", i + 1);
+        mach->stations[idx].name = strdup(nameBuf); 
         mach->stations[idx].busy = false;
         mach->stations[idx].op = NULL;
         mach->stations[idx].Qj = NULL;
@@ -273,14 +308,15 @@ int getRequiredRSType(String op) {
     if (strcmp(op, "ADD") == 0 || strcmp(op, "SUB") == 0) return RS_TYPE_ADD;
     if (strcmp(op, "MUL") == 0 || strcmp(op, "DIV") == 0) return RS_TYPE_MUL;
     // TEMPORARIO, vamos mapear LD/SD para ADD
-    if (strcmp(op, "LD") == 0 || strcmp(op, "SD") == 0) return RS_TYPE_ADD; 
+    if (strcmp(op, "LD") == 0 || strcmp(op, "SD") == 0) return RS_TYPE_LST; 
     return 0;
 }
 //Função auxiliar apenas para definir a demora do ciclo
 int getLatency(Machine *mach, String op) {
-    if (strcmp(op, "MUL") == 0) return mach->latMUL;  // Multiplicação demora mais
-    if (strcmp(op, "DIV") == 0) return mach->latDIV; // Divisão demora muito
-    return mach->latPattern; // ADD, SUB, LD, SD demoram 2 ciclos por padrão
+    if (strcmp(op, "MUL") == 0) return mach->latMUL;
+    if (strcmp(op, "DIV") == 0) return mach->latDIV; 
+    if (strcmp(op, "LD") == 0 || strcmp(op, "SD") == 0) return mach->latLST; 
+    return mach->latADD; // ADD, SUB
 }
 
 bool issueInstruction(Machine *mach, size_t *pc) {
@@ -350,7 +386,9 @@ void executeInstructions(Machine *mach) {
     for (size_t i = 0; i < mach->numStations; i++) {
         ReservationStation *rs = &mach->stations[i];
         
-        if (rs->busy && rs->Rj && rs->Rk && rs->cyclesLeft > 0) {
+        if (rs->canExecThisCycle) {
+
+       // if (rs->busy && rs->Rj && rs->Rk && rs->cyclesLeft > 0) {
             
             rs->cyclesLeft--; // Consome 1 ciclo de clock
             
@@ -376,8 +414,8 @@ void executeInstructions(Machine *mach) {
 bool writeResult(Machine *mach) {
     for (size_t i = 0; i < mach->numStations; i++) {
         ReservationStation *rs = &mach->stations[i];
-        
-        if (rs->busy && rs->Rj && rs->Rk && rs->cyclesLeft == 0) {
+        if (rs->canWriteThisCycle) {
+//        if (rs->busy && rs->Rj && rs->Rk && rs->cyclesLeft == 0) {
             
             Value outResult = rs->result;
 

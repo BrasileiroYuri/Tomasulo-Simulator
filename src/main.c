@@ -19,9 +19,11 @@ int main(int argc, char *argv[]) {
       .RegFileSize = REGFILE_SIZE,
       .numAddStations = 3,
       .numMulStations = 2,
-      .latPattern = 2,   // 4 ciclos para ADD, SUB, LD, SD
+      .numLSTStations = 3,
+      .latADD = 2,   // 4 ciclos para ADD, SUB
       .latMUL = 10,      // 10 ciclos para MUL
-      .latDIV = 40       // 40 ciclos para DIV
+      .latDIV = 40,       // 40 ciclos para DIV
+      .latLST = 2
   };
 
   Machine mach;
