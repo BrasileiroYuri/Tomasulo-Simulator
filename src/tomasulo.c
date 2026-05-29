@@ -1,4 +1,5 @@
 #include "../include/tomasulo.h"
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -25,6 +26,7 @@ void initMachine(Machine *mach, MachineConfig mcfg) {
   createRegFile(&mach->regFile, mcfg.dataMemSize);
   createQueue(&mach->queue, mcfg.instrMemSize);
   createStations(mach, mcfg);
+  createRegisterTable(&mach->regTable, mcfg.RegFileSize);
 
   //! - [2] Iniciando componentes.
 }
@@ -35,6 +37,7 @@ void endMachine(Machine *mach) {
   free(mach->dataMem.mem);
   free(mach->regFile.regs);
   free(mach->queue.queue);
+  free(mach->regTable.stations);
 
   printf("\n>>> Encerrando máquina.\n");
 };
@@ -49,22 +52,52 @@ void createDataMemory(DataMemory *dataMem, size_t size) {
   dataMem->size = size;
 };
 
+// Retorna true se houver alguma Estacao de Reserva ocupada trabalhando
+bool hasBusyStations(Machine *mach) {
+    for (size_t i = 0; i < mach->numStations; i++) {
+        if (mach->stations[i].busy) {
+            return true;
+        }
+    }
+    return false;
+}
 void simulation(Machine *mach) {
   printf(">>> Iniciando simulação:\n");
 
-  size_t done = 0;
-  size_t size = mach->instrMem.size;
+  size_t pc = 0;
   int clock = 1;
 
-  while (done < size) {
-    //! Colocar mais uma instrução em Issue...
-    //Isso aki em baxio é para testar
+  while (pc < mach->queue.size || hasBusyStations(mach)) {
+
+    //! [1] ISSUE (Despacho)
+    if (pc < mach->queue.size) {
+      issueInstruction(mach, &pc);
+    }
+    
+    //! [2] EXECUTE (Execução)
+    executeInstructions(mach);
+
+    //! [3] WRITE RESULT (Escrita no CDB)
+    writeResult(mach);
+
     printState(mach, clock);
-    done++;
+    
     clock++;
+    
+    // Trava de segurança limite, para teste
+    if (clock > 50) {
+        printf("\n[!] Limite de 50 ciclos atingido. Encerrando por seguranca.\n");
+        break;
+    }
   }
 
   printf(">>> Finalizando simulação.\n");
+}
+
+void createRegisterTable(RegisterTable *regTable, size_t size) {
+    printf("\t- Instanciando RegisterTable (Renomeacao).\n");
+    regTable->size = size;
+    regTable->stations = calloc(size, sizeof(ReservationStation *));
 }
 
 //Função para remover comentários do .asm
@@ -231,3 +264,152 @@ void printState(Machine *mach, int clock) {
     }
     printf("=========================================================================\n");
 }
+
+// Função auxiliar para saber qual tipo de RS a instrução precisa
+int getRequiredRSType(String op) {
+    if (strcmp(op, "ADD") == 0 || strcmp(op, "SUB") == 0) return RS_TYPE_ADD;
+    if (strcmp(op, "MUL") == 0 || strcmp(op, "DIV") == 0) return RS_TYPE_MUL;
+    // TEMPORARIO, vamos mapear LD/SD para ADD
+    if (strcmp(op, "LD") == 0 || strcmp(op, "SD") == 0) return RS_TYPE_ADD; 
+    return 0;
+}
+//Função auxiliar apenas para definir a demora do ciclo
+int getLatency(String op) {
+    if (strcmp(op, "MUL") == 0) return 5;  // Multiplicação demora mais
+    if (strcmp(op, "DIV") == 0) return 10; // Divisão demora muito
+    return 2; // ADD, SUB, LD, SD demoram 2 ciclos por padrão
+}
+
+bool issueInstruction(Machine *mach, size_t *pc) {
+    if (*pc >= mach->queue.size) return false; 
+
+    Instruction *instr = &mach->queue.queue[*pc];
+    int requiredType = getRequiredRSType(instr->name);
+
+    ReservationStation *freeRS = NULL;
+    for (size_t i = 0; i < mach->numStations; i++) {
+        if (mach->stations[i].type == requiredType && mach->stations[i].busy == false) {
+            freeRS = &mach->stations[i];
+            break; 
+        }
+    }
+
+    // Se não achou RS livre, ocorre um STALL
+    if (freeRS == NULL) {
+        return false; 
+    }
+
+    freeRS->busy = true;
+    freeRS->op = instr->name;
+
+    if (instr->src1.num != 255) { // Se for um registrador válido
+        ReservationStation *producer = mach->regTable.stations[instr->src1.num];
+        if (producer == NULL) { // Valor está pronto no Register File
+            freeRS->Vj = mach->regFile.regs[instr->src1.num].value;
+            freeRS->Qj = NULL;
+            freeRS->Rj = true;
+        } else { // Valor vai ser produzido por outra RS
+            freeRS->Qj = producer;
+            freeRS->Rj = false;
+        }
+    }
+
+    if (instr->src2.num == 255) { // É um valor imediato
+        freeRS->Vk = instr->src2.value;
+        freeRS->Qk = NULL;
+        freeRS->Rk = true;
+    } else { // É um registrador
+        ReservationStation *producer = mach->regTable.stations[instr->src2.num];
+        if (producer == NULL) { // Pronto no RegFile
+            freeRS->Vk = mach->regFile.regs[instr->src2.num].value;
+            freeRS->Qk = NULL;
+            freeRS->Rk = true;
+        } else { // Aguardando outra RS
+            freeRS->Qk = producer;
+            freeRS->Rk = false;
+        }
+    }
+
+    // Instruções SD (Store) não escrevem em registradores, então ignoramos
+    if (strcmp(instr->name, "SD") != 0) {
+        mach->regTable.stations[instr->dest.num] = freeRS;
+    }
+    
+    freeRS->cyclesLeft = getLatency(instr->name);
+
+    instr->currState = ISSUE; // Atualiza status da instrução
+    (*pc)++;                  // Avança para a próxima instrução na fila
+
+    return true;
+}
+
+void executeInstructions(Machine *mach) {
+    for (size_t i = 0; i < mach->numStations; i++) {
+        ReservationStation *rs = &mach->stations[i];
+        
+        if (rs->busy && rs->Rj && rs->Rk && rs->cyclesLeft > 0) {
+            
+            rs->cyclesLeft--; // Consome 1 ciclo de clock
+            
+            // Se terminou a execução neste ciclo, calcula o resultado!
+            if (rs->cyclesLeft == 0) {
+                if (strcmp(rs->op, "ADD") == 0) rs->result = rs->Vj + rs->Vk;
+                else if (strcmp(rs->op, "SUB") == 0) rs->result = rs->Vj - rs->Vk;
+                else if (strcmp(rs->op, "MUL") == 0) rs->result = rs->Vj * rs->Vk;
+                else if (strcmp(rs->op, "DIV") == 0) {
+                    if (rs->Vk != 0) rs->result = rs->Vj / rs->Vk;
+                    else rs->result = 0; // Evita divisão por zero
+                }
+                // Para simplificar LD/SD no simulador base, passamos o valor da memória/offset
+                else if (strcmp(rs->op, "LD") == 0 || strcmp(rs->op, "SD") == 0) {
+                    rs->result = rs->Vj + rs->Vk; 
+                }
+            }
+        }
+    }
+}
+
+//Função que Retorna true se  escreveu no CDB 
+bool writeResult(Machine *mach) {
+    for (size_t i = 0; i < mach->numStations; i++) {
+        ReservationStation *rs = &mach->stations[i];
+        
+        if (rs->busy && rs->Rj && rs->Rk && rs->cyclesLeft == 0) {
+            
+            Value outResult = rs->result;
+
+
+            for (size_t j = 0; j < mach->numStations; j++) {
+                ReservationStation *waiter = &mach->stations[j];
+                if (waiter->busy) {
+                    if (waiter->Qj == rs) {
+                        waiter->Vj = outResult;
+                        waiter->Qj = NULL;
+                        waiter->Rj = true;
+                    }
+                    if (waiter->Qk == rs) {
+                        waiter->Vk = outResult;
+                        waiter->Qk = NULL;
+                        waiter->Rk = true;
+                    }
+                }
+            }
+
+            for (size_t r = 0; r < mach->regTable.size; r++) {
+                if (mach->regTable.stations[r] == rs) {
+                    mach->regFile.regs[r].value = outResult;
+                    mach->regTable.stations[r] = NULL;       
+                }
+            }
+
+            rs->busy = false;
+            rs->op = NULL;
+            
+            // Com 1 CDB, apenas 1 instrução escreve por ciclo.
+            return true; 
+        }
+    }
+    return false; 
+}
+
+// Retorna true se houver alguma Estacao de Reserva ocupada trabalhando

@@ -66,6 +66,8 @@ typedef struct ReservationStation {
   struct ReservationStation *Qk; //! RS responsável por retornar Vk.
   bool Rj;                       //! Define se Vj está disponível.
   bool Rk;                       //! Define se Vk está disponível.
+  int cyclesLeft;                //! Ciclos restantes para terminar a execução.
+  Value result;                  //! O resultado calculado (esperando para ir para o CDB).
 } ReservationStation;
 
 /*
@@ -221,3 +223,31 @@ void createStations(Machine *mach, MachineConfig mcfg);
  * @param clock Ciclo de clock atual.
  */
 void printState(Machine *mach, int clock);
+
+/*
+ * @brief Inicializa a Tabela de Registradores (Register Table) para renomeação.
+ * Aloca a memória necessária e define todas as posições como NULL, indicando 
+ * que, inicialmente, nenhum registrador está aguardando resultados de uma 
+ * Estação de Reserva.
+ *
+ * @param regTable Ponteiro para a tabela de registradores a ser inicializada.
+ * @param size Quantidade de registradores na arquitetura (tamanho da tabela).
+ */
+void createRegisterTable(RegisterTable *regTable, size_t size);
+
+/*
+ * @brief Executa a etapa de Issue (Despacho) do algoritmo de Tomasulo.
+ * Tenta buscar a próxima instrução da fila e alocá-la em uma Estação de Reserva
+ * livre do tipo adequado. Também realiza a leitura dos operandos e a renomeação 
+ * de registradores na Register Table.
+ *
+ * @param mach Ponteiro para a máquina atual.
+ * @param pc Ponteiro para o Program Counter (índice da instrução atual na fila).
+ * @return true se a instrução foi despachada com sucesso, false se houve Stall 
+ * (falta de estação de reserva livre).
+ */
+bool issueInstruction(Machine *mach, size_t *pc);
+
+void executeInstructions(Machine *mach);
+
+bool writeResult(Machine *mach); 
